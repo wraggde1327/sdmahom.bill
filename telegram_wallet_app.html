@@ -1,0 +1,173 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Кошелёк</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      background: #fff;
+      color: #222;
+      padding: 10px;
+    }
+    h2 {
+      margin-top: 0;
+      font-size: 20px;
+    }
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 10px;
+      border-radius: 8px;
+      background: #f0f0f0;
+      cursor: pointer;
+    }
+    .tab.active {
+      background: #0088cc;
+      color: white;
+    }
+    .card {
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #f9f9f9;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 15px;
+      margin-bottom: 5px;
+    }
+    .buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    button {
+      flex: 1;
+      padding: 10px;
+      font-size: 14px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .primary {
+      background: #0088cc;
+      color: white;
+    }
+    .secondary {
+      background: #eee;
+    }
+  </style>
+</head>
+<body>
+  <h2>Личный кабинет</h2>
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('awaiting')">Ожидают</div>
+    <div class="tab" onclick="switchTab('paid')">Оплачено</div>
+  </div>
+
+  <div id="list"></div>
+
+  <div class="buttons">
+    <button class="secondary" onclick="fetchData()">Обновить</button>
+    <button class="primary" onclick="sendData()">Отправить</button>
+  </div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+
+    const scriptURL = "https://script.google.com/macros/s/AKfycbxWffiSDr2e5X0aBsaP4g5r32wYO-mHMZh8sdXlZzOjYBBM5OFFtmamZ1bpApG1GTAEmA/exec";
+    let allData = [], currentTab = 'awaiting';
+
+    async function fetchData() {
+      const response = await fetch(scriptURL);
+      const result = await response.json();
+      if (result.status === 'success') {
+        allData = result.data;
+        render();
+      } else {
+        alert('Ошибка загрузки');
+      }
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab')[tab === 'awaiting' ? 0 : 1].classList.add('active');
+      render();
+    }
+
+    function render() {
+      const list = document.getElementById('list');
+      list.innerHTML = '';
+      const filtered = allData.filter(i => {
+        return currentTab === 'awaiting' ? i.status !== 'оплачено' : i.status === 'оплачено';
+      });
+      filtered.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <div class="row"><strong>${item.name}</strong><span>${item.sum} ₽</span></div>
+          <div class="row"><small>${item.dateb || '—'}</small><small>${item.bill || ''} ${item.numbb || ''}</small></div>
+          <div class="row"><small>Статус: ${item.status}</small></div>
+          ${currentTab === 'awaiting' ? `<button onclick="markPaid(${item.rowNumber})" class="primary">Оплачено</button>` : ''}
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    async function markPaid(rowNumber) {
+      const item = allData.find(i => i.rowNumber == rowNumber);
+      if (!item) return;
+      const newSum = prompt("Введите новую сумму", item.sum);
+      if (!newSum) return;
+
+      item.sum = newSum;
+      item.status = "оплачено";
+
+      const response = await fetch(scriptURL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: [item] })
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        alert("Обновлено!");
+        fetchData();
+      } else {
+        alert("Ошибка сохранения");
+      }
+    }
+
+    async function sendData() {
+      const updated = allData.filter(i => i.status === 'оплачено');
+      const response = await fetch(scriptURL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: updated })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        alert("Отправлено");
+      } else {
+        alert("Ошибка при отправке");
+      }
+    }
+
+    fetchData();
+  </script>
+</body>
+</html>

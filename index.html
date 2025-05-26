@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Кошелек</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f2f2f2;
+    }
+    .tab {
+      cursor: pointer;
+      padding: 10px;
+      border-radius: 6px;
+      margin-right: 10px;
+      display: inline-block;
+      background: #ddd;
+    }
+    .tab.active {
+      background: #0088cc;
+      color: white;
+    }
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+    }
+    .client-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 16px;
+      margin-bottom: 6px;
+    }
+    .client-status {
+      font-size: 14px;
+      background: #ffeeba;
+      padding: 3px 8px;
+      border-radius: 10px;
+    }
+    .paid .client-status {
+      background: #c3e6cb;
+      color: #155724;
+    }
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .btn {
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .btn-refresh {
+      background: #ccc;
+    }
+    .btn-send {
+      background: #0088cc;
+      color: white;
+    }
+    .modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 350px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Кошелек</h2>
+  <div>
+    <span class="tab active" onclick="switchTab('awaiting')">Ожидают</span>
+    <span class="tab" onclick="switchTab('paid')">Оплачено</span>
+  </div>
+  <div class="button-group">
+    <button class="btn btn-refresh" onclick="fetchData()">Обновить</button>
+    <button class="btn btn-send" onclick="sendPaid()">Отправить</button>
+  </div>
+  <div id="list"></div>
+
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <p id="modalTitle">Сумма:</p>
+      <input type="number" id="modalSum" style="width: 100%; padding: 10px; font-size: 16px;" />
+      <div class="button-group" style="margin-top: 10px;">
+        <button class="btn btn-send" onclick="confirmPayment()">Подтвердить</button>
+        <button class="btn btn-refresh" onclick="closeModal()">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    const API_URL = "https://script.google.com/macros/s/AKfycbxWffiSDr2e5X0aBsaP4g5r32wYO-mHMZh8sdXlZzOjYBBM5OFFtmamZ1bpApG1GTAEmA/exec";
+    let all = [], currentTab = "awaiting", selectedClient = null;
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll(".tab").forEach(el => el.classList.remove("active"));
+      document.querySelectorAll(".tab")[tab === "awaiting" ? 0 : 1].classList.add("active");
+      render();
+    }
+
+    async function fetchData() {
+      const res = await fetch(API_URL);
+      const data = await res.json();
+      all = data.data;
+      render();
+    }
+
+    function render() {
+      const list = document.getElementById("list");
+      list.innerHTML = "";
+      const filtered = all.filter(c => currentTab === "awaiting" ? c.status !== "оплачено" : c.status === "оплачено");
+      filtered.forEach(client => {
+        const div = document.createElement("div");
+        div.className = "card" + (client.status === "оплачено" ? " paid" : "");
+        div.innerHTML = `
+          <div class="client-row"><strong>${client.name}</strong><span>${client.sum} ₽</span></div>
+          <div class="client-row"><span>${client.bill || ""} ${client.numbb || ""}</span><span>${client.dateb || ""}</span></div>
+          <div class="client-row"><span class="client-status">${client.status}</span></div>
+        `;
+        if (client.status !== "оплачено") div.onclick = () => openModal(client);
+        list.appendChild(div);
+      });
+    }
+
+    function openModal(client) {
+      selectedClient = client;
+      document.getElementById("modal").style.display = "flex";
+      document.getElementById("modalSum").value = client.sum;
+    }
+
+    function closeModal() {
+      document.getElementById("modal").style.display = "none";
+      selectedClient = null;
+    }
+
+    async function confirmPayment() {
+      const sum = document.getElementById("modalSum").value;
+      if (!sum || !selectedClient) return;
+      selectedClient.sum = sum;
+      selectedClient.status = "оплачено";
+      await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: [selectedClient] })
+      });
+      closeModal();
+      fetchData();
+    }
+
+    async function sendPaid() {
+      const paid = all.filter(c => c.status === "оплачено");
+      await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: paid })
+      });
+      alert("Отправлено!");
+    }
+
+    fetchData();
+  </script>
+</body>
+</html>

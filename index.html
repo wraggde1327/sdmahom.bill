@@ -2,135 +2,26 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Махом!</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.3/dist/tailwind.min.css"  />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#facc15" />
 </head>
-<body>
-  <div class="app">
-    <!-- Header -->
-    <header class="header">
-      <h1 class="title">Махом!</h1>
-      <div class="header-buttons">
-        <button id="refresh-btn" title="Обновить данные">
-          🔁
-        </button>
-        <button id="add-btn">+</button>
-      </div>
-    </header>
+<body class="bg-gray-100 min-h-screen font-sans">
+  <div id="root"></div>
 
-    <!-- Stats -->
-    <main class="main">
-      <!-- Balance -->
-      <div id="balance-box" class="balance">
-        <p class="label">Баланс</p>
-        <p id="balance-value">0 ₽</p>
-      </div>
-
-      <!-- Expanded Accounts -->
-      <div id="expanded-balance" class="expanded-balance hidden">
-        <ul id="account-list"></ul>
-      </div>
-
-      <!-- Income / Expense -->
-      <div class="income-expense">
-        <div class="income">
-          <p class="label">Доход</p>
-          <p id="income-value">0 ₽</p>
-        </div>
-        <div class="expense">
-          <p class="label">Расход</p>
-          <p id="expense-value">0 ₽</p>
-        </div>
-      </div>
-
-      <!-- Transaction History -->
-      <h2 class="history-title">История</h2>
-      <div id="transaction-history"></div>
-    </main>
-
-    <!-- Footer Buttons -->
-    <footer class="footer">
-      <button id="accounts-btn">Счета</button>
-      <button id="categories-btn">Категории</button>
-    </footer>
-
-    <!-- Modal Add Transaction -->
-    <div id="modal-add" class="modal hidden">
-      <div class="modal-content">
-        <h2>Новая операция</h2>
-        <div class="input-group">
-          <label>Тип</label>
-          <div class="type-buttons">
-            <button id="type-income" class="type-btn income">Доход</button>
-            <button id="type-expense" class="type-btn expense">Расход</button>
-          </div>
-        </div>
-        <div class="input-group">
-          <label for="category-select">Категория</label>
-          <select id="category-select">
-            <option value="">Выберите</option>
-          </select>
-        </div>
-        <div class="input-group">
-          <label for="account-select">Счет</label>
-          <select id="account-select">
-            <option value="">Выберите</option>
-          </select>
-        </div>
-        <div class="input-group">
-          <label for="description-input">Описание</label>
-          <input type="text" id="description-input" placeholder="Описание" />
-        </div>
-        <div class="input-group">
-          <label for="amount-input">Сумма</label>
-          <input type="number" id="amount-input" placeholder="Сумма" />
-        </div>
-        <div class="modal-buttons">
-          <button id="save-btn">Добавить</button>
-          <button id="cancel-btn">Отменить</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal Manage Accounts -->
-    <div id="modal-accounts" class="modal hidden">
-      <div class="modal-content">
-        <h2>Счета</h2>
-        <ul id="account-list-modal"></ul>
-        <div class="input-group">
-          <input type="text" id="new-account-input" placeholder="Новый счет" />
-          <button id="add-account-btn">Добавить</button>
-        </div>
-        <button class="close-modal" onclick="toggleAccountsModal()">Закрыть</button>
-      </div>
-    </div>
-
-    <!-- Modal Manage Categories -->
-    <div id="modal-categories" class="modal hidden">
-      <div class="modal-content">
-        <h2>Категории</h2>
-        <div>
-          <h3>Доходы</h3>
-          <ul id="income-categories-list"></ul>
-          <div class="input-group">
-            <input type="text" id="new-income-category" placeholder="Новая категория" />
-            <button id="add-income-category-btn">Добавить</button>
-          </div>
-        </div>
-        <div>
-          <h3>Расходы</h3>
-          <ul id="expense-categories-list"></ul>
-          <div class="input-group">
-            <input type="text" id="new-expense-category" placeholder="Новая категория" />
-            <button id="add-expense-category-btn">Добавить</button>
-          </div>
-        </div>
-        <button class="close-modal" onclick="toggleCategoriesModal()">Закрыть</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="app.js"></script>
+  <!-- Register Service Worker -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/service-worker.js").then(() => {
+          console.log("Service worker зарегистрирован");
+        }).catch((error) => {
+          console.error("Ошибка регистрации service worker:", error);
+        });
+      });
+    }
+  </script>
 </body>
 </html>

@@ -1,349 +1,559 @@
-// Инициализация данных
-let transactions = JSON.parse(localStorage.getItem("transactions")) || [
-  { id: 1, category: "Зарплата", account: "Основной", amount: 50000, description: "Оклад", date: "2025-06-18" },
-  { id: 2, category: "Продукты", account: "Основной", amount: -1200, description: "Покупки", date: "2025-06-17" },
-  { id: 3, category: "Транспорт", account: "Накопления", amount: -400, description: "Бензин", date: "2025-06-17" }
-];
+import React, { useState, useEffect } from "react";
 
-let accounts = JSON.parse(localStorage.getItem("accounts")) || ["Основной", "Накопления"];
-let incomeCategories = JSON.parse(localStorage.getItem("incomeCategories")) || ["Зарплата", "Подарки", "Возврат"];
-let expenseCategories = JSON.parse(localStorage.getItem("expenseCategories")) || ["Продукты", "Транспорт", "Здоровье"];
+export default function App() {
+  const [transactions, setTransactions] = useState(() => {
+    const saved = localStorage.getItem("transactions");
+    return saved ? JSON.parse(saved) : [
+      { id: 1, category: "Зарплата", account: "Основной", amount: 50000, description: "Оклад", date: "2025-06-18" },
+      { id: 2, category: "Продукты", account: "Основной", amount: -1200, description: "Покупки", date: "2025-06-17" },
+      { id: 3, category: "Транспорт", account: "Накопления", amount: -400, description: "Бензин", date: "2025-06-17" },
+    ];
+  });
 
-const transactionForm = {
-  category: "",
-  account: "",
-  amount: "",
-  description: "",
-  type: "income"
-};
+  const [accounts, setAccounts] = useState(() => {
+    const saved = localStorage.getItem("accounts");
+    return saved ? JSON.parse(saved) : ["Основной", "Накопления"];
+  });
 
-let editTransactionId = null;
+  const [incomeCategories, setIncomeCategories] = useState(() => {
+    const saved = localStorage.getItem("incomeCategories");
+    return saved ? JSON.parse(saved) : ["Зарплата", "Подарки", "Возврат"];
+  });
 
-// DOM Elements
-const modalAdd = document.getElementById("modal-add");
-const addBtn = document.getElementById("add-btn");
-const saveBtn = document.getElementById("save-btn");
-const cancelBtn = document.getElementById("cancel-btn");
-const refreshBtn = document.getElementById("refresh-btn");
+  const [expenseCategories, setExpenseCategories] = useState(() => {
+    const saved = localStorage.getItem("expenseCategories");
+    return saved ? JSON.parse(saved) : ["Продукты", "Транспорт", "Здоровье"];
+  });
 
-const balanceValueEl = document.getElementById("balance-value");
-const incomeValueEl = document.getElementById("income-value");
-const expenseValueEl = document.getElementById("expense-value");
-const transactionHistoryEl = document.getElementById("transaction-history");
-const accountSelectEl = document.getElementById("account-select");
-const categorySelectEl = document.getElementById("category-select");
-const descriptionInputEl = document.getElementById("description-input");
-const amountInputEl = document.getElementById("amount-input");
+  const [showModal, setShowModal] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [editTransactionId, setEditTransactionId] = useState(null);
+  const [expandedBalance, setExpandedBalance] = useState(false);
 
-const accountListModalEl = document.getElementById("account-list-modal");
-const newAccountInputEl = document.getElementById("new-account-input");
-const addAccountBtn = document.getElementById("add-account-btn");
+  const [newTransaction, setNewTransaction] = useState({
+    category: "",
+    account: "",
+    amount: "",
+    description: "",
+    type: "income",
+  });
 
-const incomeCategoryListEl = document.getElementById("income-categories-list");
-const expenseCategoryListEl = document.getElementById("expense-categories-list");
-const newIncomeCategoryInputEl = document.getElementById("new-income-category");
-const newExpenseCategoryInputEl = document.getElementById("new-expense-category");
-const addIncomeCategoryBtn = document.getElementById("add-income-category-btn");
-const addExpenseCategoryBtn = document.getElementById("add-expense-category-btn");
+  const [editingAccount, setEditingAccount] = useState("");
+  const [editingCategory, setEditingCategory] = useState("");
+  const [categoryTypeToAdd, setCategoryTypeToAdd] = useState("income");
 
-const accountListEl = document.getElementById("account-list");
+  // Telegram WebApp SDK
+  useEffect(() => {
+    if (window.Telegram?.WebApp) {
+      window.Telegram.WebApp.ready();
+      window.Telegram.WebApp.setHeaderTitle("Махом!");
+      window.Telegram.WebApp.enableClosingConfirmation();
+    }
+  }, []);
 
-const balanceBoxEl = document.getElementById("balance-box");
-const expandedBalanceEl = document.getElementById("expanded-balance");
+  // Сохранение в localStorage
+  useEffect(() => {
+    localStorage.setItem("transactions", JSON.stringify(transactions));
+    localStorage.setItem("accounts", JSON.stringify(accounts));
+    localStorage.setItem("incomeCategories", JSON.stringify(incomeCategories));
+    localStorage.setItem("expenseCategories", JSON.stringify(expenseCategories));
+  }, [transactions, accounts, incomeCategories, expenseCategories]);
 
-// Текущие категории формы
-let selectedType = "income";
-
-document.addEventListener("DOMContentLoaded", () => {
-  render();
-});
-
-function render() {
-  updateStats();
-  renderTransactions();
-  populateAccountSelect();
-  populateCategorySelect(selectedType);
-  renderAccountListModal();
-  renderCategoryModals();
-  renderExpandedBalance();
-}
-
-function updateStats() {
+  // Подсчёт данных
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
 
-  const filtered = transactions.filter(t => {
+  const filteredMonthly = transactions.filter(t => {
     const tDate = new Date(t.date);
     return tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
   });
 
-  const totalIncome = filtered
+  const totalIncome = filteredMonthly
     .filter(t => t.amount > 0)
     .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
   const totalExpense = Math.abs(
-    filtered
+    filteredMonthly
       .filter(t => t.amount < 0)
       .reduce((sum, t) => sum + t.amount, 0)
   );
 
   const balance = totalIncome - totalExpense;
 
-  balanceValueEl.textContent = formatCurrency(balance);
-  incomeValueEl.textContent = formatCurrency(totalIncome);
-  expenseValueEl.textContent = formatCurrency(totalExpense);
-}
+  // Группировка по датам
+  const groupTransactionsByDate = () =>
+    transactions.reduce((groups, tx) => {
+      const date = new Date(tx.date).toLocaleDateString("ru-RU", {
+        day: "numeric",
+        month: "long",
+      });
+      if (!groups[date]) groups[date] = [];
+      groups[date].push(tx);
+      return groups;
+    }, {});
 
-function renderTransactions() {
-  transactionHistoryEl.innerHTML = "";
-  const grouped = groupByDate(transactions);
-  Object.entries(grouped).forEach(([date, txs]) => {
-    const group = document.createElement("div");
-    group.classList.add("transaction-group");
+  const groupedTransactions = groupTransactionsByDate();
 
-    const heading = document.createElement("h3");
-    heading.textContent = date;
-    group.appendChild(heading);
-
-    txs.forEach(tx => {
-      const div = document.createElement("div");
-      div.className = "transaction";
-      div.innerHTML = `
-        <div>
-          <p>${tx.description}</p>
-          <small>${tx.category} • ${tx.account}</small>
-        </div>
-        <span class="${tx.amount >= 0 ? 'amount-green' : 'amount-red'}">${formatCurrency(tx.amount)} ₽</span>
-      `;
-      group.appendChild(div);
-    });
-
-    transactionHistoryEl.appendChild(group);
-  });
-}
-
-function groupByDate(transactions) {
-  return transactions.reduce((groups, tx) => {
-    const date = new Date(tx.date).toLocaleDateString("ru-RU", {
-      day: "numeric",
-      month: "long"
-    });
-    if (!groups[date]) groups[date] = [];
-    groups[date].push(tx);
-    return groups;
-  }, {});
-}
-
-function populateAccountSelect() {
-  accountSelectEl.innerHTML = `<option value="">Выберите</option>`;
-  accounts.forEach(acc => {
-    const option = document.createElement("option");
-    option.value = acc;
-    option.textContent = acc;
-    accountSelectEl.appendChild(option);
-  });
-}
-
-function populateCategorySelect(type) {
-  categorySelectEl.innerHTML = `<option value="">Выберите</option>`;
-  const categories = type === "income" ? incomeCategories : expenseCategories;
-  categories.forEach(cat => {
-    const option = document.createElement("option");
-    option.value = cat;
-    option.textContent = cat;
-    categorySelectEl.appendChild(option);
-  });
-}
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat("ru-RU").format(amount);
-}
-
-// --- Modal Logic ---
-
-addBtn.onclick = () => {
-  resetForm();
-  modalAdd.classList.remove("hidden");
-};
-
-cancelBtn.onclick = () => {
-  modalAdd.classList.add("hidden");
-};
-
-document.getElementById("type-income").onclick = () => {
-  selectedType = "income";
-  populateCategorySelect(selectedType);
-  document.getElementById("type-income").classList.add("active");
-  document.getElementById("type-expense").classList.remove("active");
-};
-
-document.getElementById("type-expense").onclick = () => {
-  selectedType = "expense";
-  populateCategorySelect(selectedType);
-  document.getElementById("type-expense").classList.add("active");
-  document.getElementById("type-income").classList.remove("active");
-};
-
-saveBtn.onclick = () => {
-  const category = categorySelectEl.value;
-  const account = accountSelectEl.value;
-  const description = descriptionInputEl.value;
-  const amount = parseFloat(amountInputEl.value);
-
-  if (!category || !account || !description || isNaN(amount)) {
-    alert("Заполните все поля!");
-    return;
-  }
-
-  const finalAmount =
-    selectedType === "income" ? amount : -Math.abs(amount);
-
-  const transaction = {
-    id: Date.now(),
-    category,
-    account,
-    amount: finalAmount,
-    description,
-    date: new Date().toISOString().split("T")[0]
+  // Обработчики событий
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setNewTransaction({ ...newTransaction, [name]: value });
   };
 
-  transactions.unshift(transaction);
-  localStorage.setItem("transactions", JSON.stringify(transactions));
-  modalAdd.classList.add("hidden");
-  render();
-};
+  const handleSubmit = () => {
+    if (
+      !newTransaction.category ||
+      !newTransaction.account ||
+      !newTransaction.description ||
+      !newTransaction.amount
+    )
+      return;
 
-function resetForm() {
-  categorySelectEl.selectedIndex = 0;
-  accountSelectEl.selectedIndex = 0;
-  descriptionInputEl.value = "";
-  amountInputEl.value = "";
-  selectedType = "income";
-  document.getElementById("type-income").classList.add("active");
-  document.getElementById("type-expense").classList.remove("active");
-  populateCategorySelect("income");
-}
+    const amount =
+      newTransaction.type === "income"
+        ? parseFloat(newTransaction.amount)
+        : -Math.abs(parseFloat(newTransaction.amount));
 
-// --- Account Modal ---
-document.getElementById("accounts-btn").onclick = toggleAccountsModal;
-function toggleAccountsModal() {
-  document.getElementById("modal-accounts").classList.toggle("hidden");
-}
+    const transaction = {
+      id: Date.now(),
+      category: newTransaction.category,
+      account: newTransaction.account,
+      amount,
+      description: newTransaction.description,
+      date: new Date().toISOString().split("T")[0],
+    };
 
-document.getElementById("add-account-btn").onclick = () => {
-  const name = newAccountInputEl.value.trim();
-  if (name && !accounts.includes(name)) {
-    accounts.push(name);
-    localStorage.setItem("accounts", JSON.stringify(accounts));
-    newAccountInputEl.value = "";
-    render();
-  }
-};
+    setTransactions([transaction, ...transactions]);
+    setNewTransaction({
+      category: "",
+      account: "",
+      amount: "",
+      description: "",
+      type: "income",
+    });
+    setShowModal(false);
+  };
 
-function renderAccountListModal() {
-  accountListModalEl.innerHTML = "";
-  accounts.forEach((acc, i) => {
-    const li = document.createElement("li");
-    li.innerHTML = `${acc} <button onclick="deleteAccount(${i})">Удалить</button>`;
-    accountListModalEl.appendChild(li);
-  });
-}
+  const handleEditTransaction = (id) => {
+    const transaction = transactions.find(t => t.id === id);
+    if (transaction) {
+      setNewTransaction(transaction);
+      setEditTransactionId(id);
+      setShowModal(true);
+    }
+  };
 
-window.deleteAccount = function(index) {
-  accounts.splice(index, 1);
-  localStorage.setItem("accounts", JSON.stringify(accounts));
-  render();
-};
+  const handleSaveEditedTransaction = () => {
+    if (
+      !newTransaction.category ||
+      !newTransaction.account ||
+      !newTransaction.description ||
+      !newTransaction.amount
+    )
+      return;
 
-// --- Category Modal ---
-document.getElementById("categories-btn").onclick = toggleCategoriesModal;
-function toggleCategoriesModal() {
-  document.getElementById("modal-categories").classList.toggle("hidden");
-}
+    const updatedTransactions = transactions.map(t =>
+      t.id === editTransactionId ? { ...t, ...newTransaction } : t
+    );
 
-function renderCategoryModals() {
-  // Доходы
-  incomeCategoryListEl.innerHTML = "";
-  incomeCategories.forEach((cat, i) => {
-    const li = document.createElement("li");
-    li.innerHTML = `${cat} <button onclick="deleteIncomeCategory(${i})">Удалить</button>`;
-    incomeCategoryListEl.appendChild(li);
-  });
+    setTransactions(updatedTransactions);
+    setEditTransactionId(null);
+    setShowModal(false);
+  };
 
-  // Расходы
-  expenseCategoryListEl.innerHTML = "";
-  expenseCategories.forEach((cat, i) => {
-    const li = document.createElement("li");
-    li.innerHTML = `${cat} <button onclick="deleteExpenseCategory(${i})">Удалить</button>`;
-    expenseCategoryListEl.appendChild(li);
-  });
-}
+  const closeTelegram = () => {
+    if (window.Telegram?.WebApp) {
+      window.Telegram.WebApp.close();
+    } else {
+      window.close();
+    }
+  };
 
-addIncomeCategoryBtn.onclick = () => {
-  const val = newIncomeCategoryInputEl.value.trim();
-  if (val && !incomeCategories.includes(val)) {
-    incomeCategories.push(val);
-    localStorage.setItem("incomeCategories", JSON.stringify(incomeCategories));
-    newIncomeCategoryInputEl.value = "";
-    render();
-  }
-};
+  return (
+    <div className="bg-gray-100 min-h-screen font-sans">
+      {/* Header */}
+      <header className="bg-white shadow p-3 flex justify-between items-center">
+        <h1 className="text-lg font-bold text-gray-800">Махом!</h1>
+        <button
+          onClick={() => setShowModal(true)}
+          className="bg-yellow-500 hover:bg-yellow-600 text-white w-10 h-10 rounded-full flex items-center justify-center transition"
+        >
+          +
+        </button>
+      </header>
 
-addExpenseCategoryBtn.onclick = () => {
-  const val = newExpenseCategoryInputEl.value.trim();
-  if (val && !expenseCategories.includes(val)) {
-    expenseCategories.push(val);
-    localStorage.setItem("expenseCategories", JSON.stringify(expenseCategories));
-    newExpenseCategoryInputEl.value = "";
-    render();
-  }
-};
+      {/* Stats */}
+      <main className="p-3 space-y-4">
+        {/* Баланс */}
+        <div
+          className="bg-yellow-500 text-white rounded shadow py-2 cursor-pointer text-center"
+          onClick={() => setExpandedBalance(!expandedBalance)}
+        >
+          <p className="text-xs">Баланс</p>
+          <p className="font-semibold">{balance.toLocaleString("ru-RU")} ₽</p>
+        </div>
 
-window.deleteIncomeCategory = function(i) {
-  incomeCategories.splice(i, 1);
-  localStorage.setItem("incomeCategories", JSON.stringify(incomeCategories));
-  render();
-};
+        {/* Раскрытие баланса по счетам */}
+        {expandedBalance && (
+          <div className="bg-white rounded shadow p-2 mb-4">
+            <h3 className="text-sm font-medium mb-2">Счета:</h3>
+            <ul>
+              {accounts.map(account => (
+                <li key={account} className="flex justify-between items-center">
+                  <span>{account}</span>
+                  <span>
+                    {transactions
+                      .filter(t => t.account === account)
+                      .reduce((sum, t) => sum + t.amount, 0)
+                      .toLocaleString("ru-RU")}{" "}
+                    ₽
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
-window.deleteExpenseCategory = function(i) {
-  expenseCategories.splice(i, 1);
-  localStorage.setItem("expenseCategories", JSON.stringify(expenseCategories));
-  render();
-};
+        {/* Доходы и расходы */}
+        <div className="grid grid-cols-2 gap-2 text-center text-sm">
+          <div className="bg-green-500 text-white rounded shadow py-2">
+            <p className="text-xs">Доход</p>
+            <p className="font-semibold">{totalIncome.toLocaleString("ru-RU")} ₽</p>
+          </div>
+          <div className="bg-red-500 text-white rounded shadow py-2">
+            <p className="text-xs">Расход</p>
+            <p className="font-semibold">{totalExpense.toLocaleString("ru-RU")} ₽</p>
+          </div>
+        </div>
 
-function renderExpandedBalance() {
-  accountListEl.innerHTML = "";
-  accounts.forEach(acc => {
-    const sum = transactions
-      .filter(t => t.account === acc)
-      .reduce((s, t) => s + t.amount, 0);
-    const li = document.createElement("li");
-    li.innerHTML = `<strong>${acc}</strong>: ${formatCurrency(sum)} ₽`;
-    accountListEl.appendChild(li);
-  });
-}
+        {/* История */}
+        <h2 className="text-sm font-semibold mt-4">История</h2>
+        {Object.entries(groupedTransactions).map(([date, txs]) => (
+          <div key={date}>
+            <h3 className="text-sm font-medium mb-2">{date}</h3>
+            <ul className="space-y-1">
+              {txs.map((t) => (
+                <li key={t.id} className="bg-white rounded shadow-sm p-2 flex justify-between items-center text-sm">
+                  <div className="flex-1">
+                    <p className="font-medium">{t.description}</p>
+                    <p className="text-xs text-gray-500">
+                      {t.category} • {t.account}
+                    </p>
+                  </div>
+                  <p
+                    className={`font-semibold ${
+                      t.amount >= 0 ? "text-green-600" : "text-red-600"
+                    }`}
+                  >
+                    {t.amount.toLocaleString("ru-RU")} ₽
+                  </p>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handleEditTransaction(t.id)}
+                      className="text-blue-500 hover:text-blue-700"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirm(t.id)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      ❌
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </main>
 
-balanceBoxEl.onclick = () => {
-  expandedBalanceEl.classList.toggle("hidden");
-};
+      {/* Sticky Footer Buttons */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white shadow p-2 flex justify-around items-center z-10 border-t">
+        <button
+          onClick={() => setShowAccountModal(true)}
+          className="bg-yellow-500 text-white px-4 py-2 rounded"
+        >
+          Счета
+        </button>
+        <button
+          onClick={() => setShowCategoryModal(true)}
+          className="bg-yellow-500 text-white px-4 py-2 rounded"
+        >
+          Категории
+        </button>
+      </div>
 
-function renderCategorySelect(type = "income") {
-  categorySelectEl.innerHTML = '<option value="">Выберите</option>';
-  const list = type === "income" ? incomeCategories : expenseCategories;
-  list.forEach(cat => {
-    const option = document.createElement("option");
-    option.value = cat;
-    option.textContent = cat;
-    categorySelectEl.appendChild(option);
-  });
-}
+      {/* Modal Add Transaction */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-4/5 max-w-md p-4 animate-fadeIn">
+            <h2 className="text-base font-bold mb-3">Новая операция</h2>
+            <div className="mb-2">
+              <label className="block text-xs text-gray-600 mb-1">Тип</label>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setNewTransaction({...newTransaction, type: "income"})}
+                  className={`flex-1 px-2 py-1 rounded text-sm ${newTransaction.type === "income" ? "bg-green-100 text-green-700" : "bg-gray-100"}`}
+                >
+                  Доход
+                </button>
+                <button
+                  onClick={() => setNewTransaction({...newTransaction, type: "expense"})}
+                  className={`flex-1 px-2 py-1 rounded text-sm ${newTransaction.type === "expense" ? "bg-red-100 text-red-700" : "bg-gray-100"}`}
+                >
+                  Расход
+                </button>
+              </div>
+            </div>
+            <div className="mb-2">
+              <label className="block text-xs text-gray-600 mb-1">Категория</label>
+              <select
+                name="category"
+                value={newTransaction.category}
+                onChange={handleChange}
+                className="w-full border border-gray-300 rounded p-1 text-sm"
+              >
+                <option value="">Выберите</option>
+                {newTransaction.type === "income" &&
+                  incomeCategories.map(cat => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                {newTransaction.type === "expense" &&
+                  expenseCategories.map(cat => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div className="mb-2">
+              <label className="block text-xs text-gray-600 mb-1">Счет</label>
+              <select
+                name="account"
+                value={newTransaction.account}
+                onChange={handleChange}
+                className="w-full border border-gray-300 rounded p-1 text-sm"
+              >
+                <option value="">Выберите</option>
+                {accounts.map(acc => (
+                  <option key={acc} value={acc}>
+                    {acc}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="mb-2">
+              <label className="block text-xs text-gray-600 mb-1">Описание</label>
+              <input
+                type="text"
+                name="description"
+                value={newTransaction.description}
+                onChange={handleChange}
+                className="w-full border border-gray-300 rounded p-1 text-sm"
+              />
+            </div>
+            <div className="mb-3">
+              <label className="block text-xs text-gray-600 mb-1">Сумма</label>
+              <input
+                type="number"
+                name="amount"
+                value={newTransaction.amount}
+                onChange={handleChange}
+                className={`w-full border border-gray-300 rounded p-1 text-sm ${
+                  newTransaction.type === "income" ? "bg-green-50" : "bg-red-50"
+                }`}
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-3 py-1 bg-gray-200 rounded text-xs"
+              >
+                Отменить
+              </button>
+              <button
+                onClick={editTransactionId ? handleSaveEditedTransaction : handleSubmit}
+                className="px-3 py-1 bg-yellow-500 text-white rounded text-xs"
+              >
+                {editTransactionId ? "Сохранить изменения" : "Добавить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-function renderAll() {
-  render();
-  populateAccountSelect();
-  populateCategorySelect(selectedType);
-  renderAccountListModal();
-  renderCategoryModals();
-  renderExpandedBalance();
+      {/* Modal Accounts */}
+      {showAccountModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-4/5 max-w-md p-4 animate-fadeIn">
+            <h2 className="text-base font-bold mb-3">Счета</h2>
+            <ul className="mb-4">
+              {accounts.map((acc, i) => (
+                <li key={i} className="flex justify-between items-center mb-1">
+                  <span>{acc}</span>
+                  <button
+                    onClick={() => setAccounts(accounts.filter(a => a !== acc))}
+                    className="text-red-500 text-sm"
+                  >
+                    Удалить
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="flex space-x-2">
+              <input
+                type="text"
+                placeholder="Новый счет"
+                value={editingAccount}
+                onChange={(e) => setEditingAccount(e.target.value)}
+                className="border border-gray-300 rounded px-2 py-1 text-sm flex-1"
+              />
+              <button
+                onClick={() => {
+                  if (editingAccount.trim()) {
+                    setAccounts([...accounts, editingAccount]);
+                    setEditingAccount("");
+                  }
+                }}
+                className="bg-yellow-500 text-white px-2 py-1 rounded text-sm"
+              >
+                Добавить
+              </button>
+            </div>
+            <button
+              onClick={() => setShowAccountModal(false)}
+              className="mt-4 w-full text-center text-sm text-gray-500 underline"
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Categories */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-4/5 max-w-md p-4 animate-fadeIn">
+            <h2 className="text-base font-bold mb-3">Категории</h2>
+            <div className="mb-4">
+              <h3 className="text-sm font-medium mb-2">Доходы</h3>
+              <ul>
+                {incomeCategories.map((item, i) => (
+                  <li key={i} className="flex justify-between items-center mb-1">
+                    <span>{item}</span>
+                    <button
+                      onClick={() => setIncomeCategories(incomeCategories.filter(c => c !== item))}
+                      className="text-red-500 text-sm"
+                    >
+                      Удалить
+                    </button>
+                  </li>
+                ))}
+                <li className="flex space-x-2 mt-2">
+                  <input
+                    type="text"
+                    placeholder="Новая категория"
+                    value={editingCategory}
+                    onChange={(e) => {
+                      setEditingCategory(e.target.value);
+                      setCategoryTypeToAdd("income");
+                    }}
+                    className="border border-gray-300 rounded px-2 py-1 text-sm flex-1"
+                  />
+                  <button
+                    onClick={() => {
+                      if (editingCategory.trim()) {
+                        setIncomeCategories([...incomeCategories, editingCategory]);
+                        setEditingCategory("");
+                      }
+                    }}
+                    className="bg-yellow-500 text-white px-2 py-1 rounded text-sm"
+                  >
+                    Добавить
+                  </button>
+                </li>
+              </ul>
+            </div>
+            <div className="mb-4">
+              <h3 className="text-sm font-medium mb-2">Расходы</h3>
+              <ul>
+                {expenseCategories.map((item, i) => (
+                  <li key={i} className="flex justify-between items-center mb-1">
+                    <span>{item}</span>
+                    <button
+                      onClick={() => setExpenseCategories(expenseCategories.filter(c => c !== item))}
+                      className="text-red-500 text-sm"
+                    >
+                      Удалить
+                    </button>
+                  </li>
+                ))}
+                <li className="flex space-x-2 mt-2">
+                  <input
+                    type="text"
+                    placeholder="Новая категория"
+                    value={editingCategory}
+                    onChange={(e) => {
+                      setEditingCategory(e.target.value);
+                      setCategoryTypeToAdd("expense");
+                    }}
+                    className="border border-gray-300 rounded px-2 py-1 text-sm flex-1"
+                  />
+                  <button
+                    onClick={() => {
+                      if (editingCategory.trim()) {
+                        setExpenseCategories([...expenseCategories, editingCategory]);
+                        setEditingCategory("");
+                      }
+                    }}
+                    className="bg-yellow-500 text-white px-2 py-1 rounded text-sm"
+                  >
+                    Добавить
+                  </button>
+                </li>
+              </ul>
+            </div>
+            <button
+              onClick={() => setShowCategoryModal(false)}
+              className="mt-4 w-full text-center text-sm text-gray-500 underline"
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Delete Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-4/5 max-w-xs p-4 animate-fadeIn text-center">
+            <p className="mb-4">Удалить эту операцию?</p>
+            <div className="flex justify-center space-x-4">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="px-4 py-1 bg-gray-200 rounded"
+              >
+                Нет
+              </button>
+              <button
+                onClick={() => {
+                  setTransactions(transactions.filter(t => t.id !== deleteConfirm));
+                  setDeleteConfirm(null);
+                }}
+                className="px-4 py-1 bg-red-500 text-white rounded"
+              >
+                Да, удалить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
